@@ -5,20 +5,78 @@
 #include "krssg_ssl_msgs/point_SF.h"
 #include "krssg_ssl_msgs/gr_Commands.h"
 #include "krssg_ssl_msgs/gr_Robot_Command.h"
+#include "krssg_ssl_msgs/BeliefState.h"
 #include <ssl_common/config.h>
 #include <ssl_common/grSimComm.h>
 using namespace std;
 
 const int MAX_VEL = 100;
+int BOT_ID = 0;
 
 typedef pair<double,double> Vector2D;
 typedef double (*max_vel)(const vector<Vector2D>& pos, int ind);
 ros::Publisher pub;
 krssg_ssl_msgs::gr_Commands final_msgs;
 krssg_ssl_msgs::gr_Robot_Command command_msgs;
+float home_pos_theta[6] = {0,0,0,0,0,0};
 
 double max_vel_naive(const vector<Vector2D>& pos, int ind){
 	return MAX_VEL;
+}
+vector<Vector2D> velocity_profile_naive2(const vector<Vector2D>& pos, const double vi, const double vf, max_vel max_vel_fn= max_vel_naive){
+	int sz = pos.size();
+	double Dy;
+	vector<Vector2D> vel(sz);
+	for(int i=0;i<sz;i++){
+		// calculate theta using five-point formula for finite difference derivative
+		double tan_theta;
+		Vector2D n1, n2, n;
+		double v;
+
+		if(i<sz-10)
+		{
+			n1 = pos[i+9];
+			n2 = pos[i+10];
+
+			n.first = (n1.first + n2.first)/2.0;
+			n.second = (n1.second + n2.second)/2.0;
+		}
+		else
+			n = pos[sz-1];
+		try{
+			tan_theta = (n.second - pos[i].second)/(n.first - pos[i].first);
+		}
+		catch(...){
+			cout<<"in catch \n";
+			Dy = (n.second - pos[i].second);
+			if(Dy==0)
+				tan_theta = 0;
+			else if(Dy>0)
+				tan_theta = 3.1416/2.0;
+			else
+				tan_theta = -3.1416/2.0;
+		}	
+		// set velocity components
+		try{
+		v = min(max_vel_fn(pos,i), vi + (vf - vi) * i / sz);
+		}
+		catch(...){
+			v = 0;
+
+		}
+
+		// cout<<"tan_theta = "<<tan_theta<<"v = "<<v<<endl;
+		double cos_theta = 1/sqrt(1+tan_theta*tan_theta);
+		vel[i].first = v*cos_theta>0.1?v*cos_theta:0;
+		vel[i].second = v*tan_theta*cos_theta>0.1?v*tan_theta*cos_theta:0;
+
+		if(i==0)
+		{
+			cout<<"pos[0] = "<<pos[0].first<<","<<pos[0].second<<" n = "<<n.first<<","<<n.second<<endl;
+			cout<<"Dy = "<<Dy<<"tan_theta = "<<tan_theta<<endl;
+		}
+	}
+	return vel;
 }
 
 vector<Vector2D> velocity_profile_naive(const vector<Vector2D>& pos, const double vi, const double vf, max_vel max_vel_fn= max_vel_naive){
@@ -57,7 +115,14 @@ vector<Vector2D> velocity_profile_naive(const vector<Vector2D>& pos, const doubl
 			tan_theta = (y1 - 8*y2 + 8*y3 - y4)/(x1 - 8*x2 + 8*x3 - x4);
 		}
 		catch(...){
-			tan_theta = 3.1416/2.0;
+			cout<<"in catch \n";
+			double Dy = (y1 - 8*y2 + 8*y3 - y4);
+			if(Dy==0)
+				tan_theta = 0;
+			else if(Dy>0)
+				tan_theta = 3.1416/2.0;
+			else
+				tan_theta = -3.1416/2.0;
 		}	
 		// set velocity components
 		try{
@@ -65,6 +130,7 @@ vector<Vector2D> velocity_profile_naive(const vector<Vector2D>& pos, const doubl
 		}
 		catch(...){
 			v = 0;
+
 		}
 
 		// cout<<"tan_theta = "<<tan_theta<<"v = "<<v<<endl;
@@ -73,6 +139,12 @@ vector<Vector2D> velocity_profile_naive(const vector<Vector2D>& pos, const doubl
 		vel[i].second = v*tan_theta*cos_theta>0.1?v*tan_theta*cos_theta:0.1;
 	}
 	return vel;
+}
+
+void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
+{
+	for(int i=0;i<6;i++)
+		home_pos_theta[i] = msg->homePos[i].theta;
 }
 
 void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
@@ -85,19 +157,20 @@ void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 		p.second = msg->point_array[i].y;
 		pos.push_back(p);
 	}
-
-	vector<Vector2D> vel = velocity_profile_naive(pos, 2, 0);
-
+	int sz = pos.size();
+	vector<Vector2D> vel = velocity_profile_naive(pos, 4*sz/400, 0);
+	float motionAngle = atan2(vel[0].second, vel[0].first);
+	float theta =  (home_pos_theta[BOT_ID] - motionAngle)*(-1);
+	float speed = sqrt(vel[0].first*vel[0].first + vel[0].second*vel[0].second);
+	cout<<"vel[0].first = "<<vel[0].first<<" vel[0].second = "<<vel[0].second<<endl;
+	cout<<"motionAngle = "<<motionAngle*180/3.1416<<endl;
 	cout<<"got velocity, size = "<<vel.size()<<endl;
-	// for(int i=0;i<vel.size();i++)
-	// {
-	// 	cout<<i<<" "<<vel[i].first<<" "<<vel[i].second<<endl;
-	// }
+	cout<<"initial point = "<<pos[0].first<<","<<pos[0].second<<"\nEnd point = "<<pos[pos.size()-1].first<<","<<pos[pos.size()-1].second<<endl;
 	
 	command_msgs.id          = 0;
 	command_msgs.wheelsspeed = 0;
-	command_msgs.veltangent  = -vel[0].second;
-	command_msgs.velnormal   = +vel[0].first;
+	command_msgs.veltangent  = speed*cos(theta);
+	command_msgs.velnormal   = speed*sin(theta);
 	command_msgs.velangular  = 0;
 	command_msgs.kickspeedx  = 0;
 	command_msgs.kickspeedz  = 0;
@@ -106,6 +179,7 @@ void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 	final_msgs.timestamp      = ros::Time::now().toSec();
 	final_msgs.isteamyellow   = false;
 	final_msgs.robot_commands = command_msgs;
+	cout<<"actual velocity = spped"<<speed<<", theta"<<motionAngle<<endl;
 	cout<<" Sending velnormal = "<<command_msgs.velnormal<<" veltangent = "<<command_msgs.veltangent<<endl;
 	pub.publish(final_msgs);
 }
@@ -117,6 +191,7 @@ int main(int argc, char **argv)
   	ros::NodeHandle n;
 	ros::Subscriber sub = n.subscribe("/path_planner_ompl", 1000, Callback);
 	pub = n.advertise<krssg_ssl_msgs::gr_Commands>("/grsim_data", 1000);
+	ros::Subscriber sub1 = n.subscribe("/belief_state", 1000, Callback_BS);
 	ros::spin();
 	return 0;
 }
