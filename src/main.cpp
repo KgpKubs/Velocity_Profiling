@@ -6,19 +6,31 @@
 #include "krssg_ssl_msgs/gr_Commands.h"
 #include "krssg_ssl_msgs/gr_Robot_Command.h"
 #include "krssg_ssl_msgs/BeliefState.h"
+#include "krssg_ssl_msgs/pid_message.h"
 #include <ssl_common/config.h>
 #include <ssl_common/grSimComm.h>
 using namespace std;
+#include <time.h>
 
+// std::vector<Vector2D> oldPos;
+float dt;
 const int MAX_VEL = 100;
 int BOT_ID = 0;
+float lastT;
+struct timeval t;
+
 
 typedef pair<double,double> Vector2D;
 typedef double (*max_vel)(const vector<Vector2D>& pos, int ind);
 ros::Publisher pub;
 krssg_ssl_msgs::gr_Commands final_msgs;
 krssg_ssl_msgs::gr_Robot_Command command_msgs;
+krssg_ssl_msgs::pid_message pidMessage;
 float home_pos_theta[6] = {0,0,0,0,0,0};
+std::vector<krssg_ssl_msgs::point_2d> homePos(6);
+krssg_ssl_msgs::point_2d lastExpected;
+
+
 
 double max_vel_naive(const vector<Vector2D>& pos, int ind){
 	return MAX_VEL;
@@ -132,8 +144,6 @@ vector<Vector2D> velocity_profile_naive(const vector<Vector2D>& pos, const doubl
 			v = 0;
 
 		}
-
-		// cout<<"tan_theta = "<<tan_theta<<"v = "<<v<<endl;
 		double cos_theta = 1/sqrt(1+tan_theta*tan_theta);
 		vel[i].first = v*cos_theta>0.1?v*cos_theta:0;
 		vel[i].second = v*tan_theta*cos_theta>0.1?v*tan_theta*cos_theta:0.1;
@@ -143,12 +153,21 @@ vector<Vector2D> velocity_profile_naive(const vector<Vector2D>& pos, const doubl
 
 void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 {
-	for(int i=0;i<6;i++)
+	for(int i=0;i<6;i++){
 		home_pos_theta[i] = msg->homePos[i].theta;
+		homePos[i].x = msg->homePos[i].x;
+		homePos[i].y = msg->homePos[i].y;
+	}
+
 }
 
 void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 {
+	long long currTime;
+	gettimeofday(&t,NULL);
+  	currTime = (long long)(t.tv_sec)*1000 + (long long)(t.tv_usec)/1000;
+	float currT = ros::Time::now().toSec();
+	float diffT = currT - lastT;
 	vector<Vector2D> pos;
 	for(int i=0;i<msg->point_array.size();i++)
 	{
@@ -159,38 +178,68 @@ void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 	}
 	int sz = pos.size();
 	vector<Vector2D> vel = velocity_profile_naive(pos, 4*sz/400, 0);
+	pidMessage.velX = vel[0].first;
+	pidMessage.velY = vel[0].second;
+	pidMessage.errorX = lastExpected.x - homePos[0].x;
+	pidMessage.errorY = lastExpected.y - homePos[0].y;
 	float motionAngle = atan2(vel[0].second, vel[0].first);
-	float theta =  (home_pos_theta[BOT_ID] - motionAngle)*(-1);
-	float speed = sqrt(vel[0].first*vel[0].first + vel[0].second*vel[0].second);
-	cout<<"vel[0].first = "<<vel[0].first<<" vel[0].second = "<<vel[0].second<<endl;
 	cout<<"motionAngle = "<<motionAngle*180/3.1416<<endl;
-	cout<<"got velocity, size = "<<vel.size()<<endl;
-	cout<<"initial point = "<<pos[0].first<<","<<pos[0].second<<"\nEnd point = "<<pos[pos.size()-1].first<<","<<pos[pos.size()-1].second<<endl;
-	
-	command_msgs.id          = 0;
-	command_msgs.wheelsspeed = 0;
-	command_msgs.veltangent  = speed*cos(theta);
-	command_msgs.velnormal   = speed*sin(theta);
-	command_msgs.velangular  = 0;
-	command_msgs.kickspeedx  = 0;
-	command_msgs.kickspeedz  = 0;
-	command_msgs.spinner     = false;
+	pub.publish(pidMessage);
 
-	final_msgs.timestamp      = ros::Time::now().toSec();
-	final_msgs.isteamyellow   = false;
-	final_msgs.robot_commands = command_msgs;
-	cout<<"actual velocity = spped"<<speed<<", theta"<<motionAngle<<endl;
-	cout<<" Sending velnormal = "<<command_msgs.velnormal<<" veltangent = "<<command_msgs.veltangent<<endl;
-	pub.publish(final_msgs);
+// #############################################################
+// #############################################################
+// #############################################################
+
+	// float theta =  (home_pos_theta[BOT_ID] - motionAngle)*(-1);
+	// float speed = sqrt(vel[0].first*vel[0].first + vel[0].second*vel[0].second);
+	// cout<<"#######################"<<endl;
+	// for (int i = 0; i < 10; ++i)
+	// {
+	// 	cout<<pos[i].first<<" "<<pos[i].second<<endl;
+	// }
+	// cout<<"######################"<<endl;
+	// cout<<"vel[0].first = "<<vel[0].first<<" vel[0].second = "<<vel[0].second<<endl;
+	// // cout<<"got velocity, size = "<<vel.size()<<endl;
+	// // cout<<"initial point = "<<pos[0].first<<","<<pos[0].second<<"\nEnd point = "<<pos[pos.size()-1].first<<","<<pos[pos.size()-1].second<<endl;
+	
+	// command_msgs.id          = 0;
+	// command_msgs.wheelsspeed = 0;
+	// command_msgs.veltangent  = speed*cos(theta);
+	// command_msgs.velnormal   = speed*sin(theta);
+	// command_msgs.velangular  = 0;
+	// command_msgs.kickspeedx  = 0;
+	// command_msgs.kickspeedz  = 0;
+	// command_msgs.spinner     = false;
+
+	// gettimeofday(&t,NULL);
+ //  	currTime = (long long)(t.tv_sec)*1000 + (long long)(t.tv_usec)/1000;
+	// cout<<"calculated expectedPos at  "<<currTime<<endl;
+	// command_msgs.nextExpectedX = vel[BOT_ID].first*diffT*1000 + homePos[BOT_ID][0];
+	// command_msgs.nextExpectedY = vel[BOT_ID].second*diffT*1000 + homePos[BOT_ID][1]; 
+	
+	// final_msgs.timestamp      = ros::Time::now().toSec();
+	// cout<<std::setprecision(15)<<final_msgs.timestamp<<"################"<<endl;
+
+	// // cout<<"\n\n##########TIME STAMP##################";
+	// // cout<<diffT/CLOCKS_PER_SEC<<endl;
+	// final_msgs.isteamyellow   = false;
+	// final_msgs.robot_commands = command_msgs;
+	// // cout<<"actual velocity = spped"<<speed<<", theta"<<motionAngle<<endl;
+	// // cout<<" Sending velnormal = "<<command_msgs.velnormal<<" veltangent = "<<command_msgs.veltangent<<endl;
+	// lastT = clock();
+	// pub.publish(final_msgs);
+	// oldPos = pos;
 }
 
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "vel_profiling");
-
   	ros::NodeHandle n;
+  	// ros::Time::init();
+	lastT = ros::Time::now().toSec();
 	ros::Subscriber sub = n.subscribe("/path_planner_ompl", 1000, Callback);
-	pub = n.advertise<krssg_ssl_msgs::gr_Commands>("/grsim_data", 1000);
+	// pub = n.advertise<krssg_ssl_msgs::gr_Commands>("/grsim_data", 1000);
+	pub = n.advertise<krssg_ssl_msgs::pid_message>("/pid", 1000);
 	ros::Subscriber sub1 = n.subscribe("/belief_state", 1000, Callback_BS);
 	ros::spin();
 	return 0;
