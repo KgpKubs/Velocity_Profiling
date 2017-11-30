@@ -24,7 +24,7 @@ void send_vel(double speed, double motion_angle)
 	cout<<"motion_angle = "<<motion_angle<<endl;
 	double bot_angle = home_pos_theta[BOT_ID];
 	double vel_tangent = speed*cos(bot_angle - motion_angle);
-	double vel_normal = speed*sin(bot_angle - motion_angle);
+	double vel_normal = -speed*sin(bot_angle - motion_angle);
 
 	command_msgs.veltangent  = vel_tangent;
 	command_msgs.velnormal   = vel_normal;
@@ -36,6 +36,7 @@ void send_vel(double speed, double motion_angle)
 	cout<<"Path_point[0] = "<<path_points[0].x<<","<<path_points[0].y<<endl;
 	cout<<"Path_point[10] = "<<path_points[10].x<<","<<path_points[10].y<<endl;
 	cout<<"vel_angle[0] = "<<vel_angle[0]<<endl;
+	cout<<"N,T = "<<vel_normal<<","<<vel_tangent<<endl;
 	return;
 }
 
@@ -66,7 +67,7 @@ void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 			send_stop();
 			return;
 		}
-		send_vel(out_speed, PI/2.0);
+		send_vel(out_speed, vel_angle[index]);
 		// cout<<"Error = "<<dist(path_points[index], home_pos[BOT_ID])<<endl;
 		// cout<<"Travelled "<<distance_traversed/path_length*100<<"percent \n";
 		// cout<<"Going with vel = "<<out_speed<<" at "<<vel_angle[index]*180/(PI)<<" degree\n";
@@ -81,9 +82,9 @@ void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 int flag = 0;
 void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 {
-	// if(flag==1) return;
-	// flag=1;
-	// cout<<"in path_planner Callback function. \n";
+	if(flag==1) return;
+	flag=1;
+	cout<<"in path_planner Callback function. \n";
 	PATH_RECEIVED = true;
 	path_points.clear();
 	vel_angle.clear();
