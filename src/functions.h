@@ -19,21 +19,21 @@ double path_length, distance_traversed, out_speed;
 point start_point, goal_point;
 int ExpectedPosIndex;
 double start_time, curr_time, ExpectedTraverseTime;
-const double MAX_SPEED = 4, MAX_ACC = 1, START_SPEED = 1, FINAL_SPEED = 0, PI = 3.14159265359;
+const double MAX_SPEED = 4000, MAX_ACC = 1000, START_SPEED = 1000, FINAL_SPEED = 0, PI = 3.14159265359;
 bool PATH_RECEIVED = false;
 
 double dist(point A, point B)
 {
   double x = B.x - A.x; double y = B.y - A.y;
-  return (x*x + y*y);
+  return sqrt(x*x + y*y);
 }
 
 int GetExpectedPositionIndex(double distance_traversed)
 {
   double distance = 0;
-  for(int i=1;i<path_points.size();i++)
+  for(int i=5;i<path_points.size();i+=5)
   {
-    distance += dist(path_points[i-1], path_points[i]);
+    distance += dist(path_points[i-5], path_points[i]);
     if(distance>distance_traversed)
       return i;
   }
@@ -43,16 +43,19 @@ int GetExpectedPositionIndex(double distance_traversed)
 double GetPathLength()
 {
   double path_length = 0;
-  for(int i=1;i<path_points.size();i++)
+  for(int i=5;i<path_points.size();i+=5)
   {
-    path_length += dist(path_points[i], path_points[i-1]);
+    path_length += dist(path_points[i], path_points[i-5]);
+    cout<<"adding "<<dist(path_points[i], path_points[i-5])<<endl;
   }
+  cout<<"in GetPathLength, pathLength = "<<path_length<<endl;
   return path_length;
 }
 
 double getTime(double distance, double pathLength, double maxSpeed,
     double maxAcc, double startSpeed,
     double finalSpeed) {
+  cout<<"pathLength = "<<pathLength<<endl;
   startSpeed = fmin(startSpeed, maxSpeed);
   finalSpeed = fmin(finalSpeed, maxSpeed);
   double rampUpTime = (maxSpeed - startSpeed) / maxAcc;
