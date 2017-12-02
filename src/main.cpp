@@ -36,8 +36,7 @@ void send_vel(double speed, double motion_angle)
 	final_msgs.timestamp      = ros::Time::now().toSec();
 	pub.publish(final_msgs);
 	cout<<"Publishing vel "<<speed<<","<<motion_angle*180.0/PI<<"\n";
-	cout<<"Path_point[0] = "<<path_points[0].x<<","<<path_points[0].y<<endl;
-	cout<<"Path_point[10] = "<<path_points[10].x<<","<<path_points[10].y<<endl;
+	
 	cout<<"vel_angle[0] = "<<vel_angle[0]<<endl;
 	cout<<"N,T = "<<vel_normal<<","<<vel_tangent<<endl;
 	return;
@@ -47,7 +46,7 @@ void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 {
 	if(PATH_RECEIVED==false)
 	{
-		cout<<"Path PATH_RECEIVED = False\n";
+		cout<<" PATH_RECEIVED = False\n";
 		return;
 	}
 
@@ -86,10 +85,21 @@ void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 			send_stop();
 			return;
 		}
+		int i=index;
+		cout<<"GetExpectedPositionIndex = "<<index<<endl;
+		if(i>=3 && i<path_points.size()-2)
+		{
+			double dx1 = path_points[i+2].x - path_points[i-2].x;
+			double dy1 = path_points[i+2].y - path_points[i-2].y;
+			cout<<"dx1 = "<<dx1<<" dy1 = "<<dy1<<endl;
+			cout<<"angle = "<<(atan2(dy1, dx1))*180/PI<<endl;
+			vel_angle[index] = atan2(dy1, dx1);
+			cout<<"vel_angle[index] = "<<vel_angle[index]*180/PI<<endl;
+		}
+		cout<<"sending vel_angle = "<<vel_angle[index]<<endl;
 		send_vel(out_speed, vel_angle[index]);
-		// cout<<"Error = "<<dist(path_points[index], home_pos[BOT_ID])<<endl;
-		// cout<<"Travelled "<<distance_traversed/path_length*100<<"percent \n";
-		// cout<<"Going with vel = "<<out_speed<<" at "<<vel_angle[index]*180/(PI)<<" degree\n";
+		cout<<"Error = "<<dist(path_points[index], home_pos[BOT_ID])<<endl;
+		cout<<"Travelled "<<distance_traversed/path_length*100<<"percent \n";
 	}
 	else
 	{
@@ -122,19 +132,19 @@ void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 			double dx1 = path_points[i+2].x - path_points[i-2].x;
 			double dy1 = path_points[i+2].y - path_points[i-2].y;
 
-			vel_angle.push_back(atan2(dy, dx));
+			vel_angle.push_back(atan2(dy1, dx1));
 		}
 		else if(i==0)
 		{
-			double dx = path_points[i+10].x - path_points[i].x;
-			double dy = path_points[i+10].y - path_points[i].y;
+			double dx = path_points[i+4].x - path_points[i].x;
+			double dy = path_points[i+4].y - path_points[i].y;
 			vel_angle.push_back(atan2(dy, dx));
 			cout<<"vel_angle[0] = "<<vel_angle[0]<<endl;
 		}
 		else
 		{
-			double dx = path_points[i].x - path_points[i-1].x;
-			double dy = path_points[i].y - path_points[i-1].y;
+			double dx = path_points[i].x - path_points[i-4].x;
+			double dy = path_points[i].y - path_points[i-4].y;
 			vel_angle.push_back(atan2(dy, dx));
 		}
 	}
@@ -148,6 +158,7 @@ void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 
 	ExpectedTraverseTime = getTime(path_length, path_length, MAX_SPEED, MAX_ACC, START_SPEED, FINAL_SPEED);
 	cout<<"ExpectedTraverseTime = "<<ExpectedTraverseTime<<"\n";
+	ExpectedTraverseTime*=1.5;
 	start_time = ros::Time::now().toSec();
 	curr_time =  ros::Time::now().toSec();
 	// cout<<"setting start_time = "<<start_time<<endl;
