@@ -6,6 +6,7 @@
 #include "krssg_ssl_msgs/gr_Commands.h"
 #include "krssg_ssl_msgs/gr_Robot_Command.h"
 #include "krssg_ssl_msgs/BeliefState.h"
+#include "krssg_ssl_msgs/pid_message.h"
 #include <ssl_common/config.h>
 #include <ssl_common/grSimComm.h>
 using namespace std;
@@ -13,6 +14,7 @@ using namespace std;
 #define point krssg_ssl_msgs::point_2d
 vector<point> home_pos(6);
 vector<point> path_points;
+// krssg_ssl_msgs::point_2d myLastPos;
 vector<double> vel_angle;
 vector<double> home_pos_theta(6);
 double path_length, distance_traversed, out_speed;
@@ -25,15 +27,21 @@ bool PATH_RECEIVED = false;
 double dist(point A, point B)
 {
   double x = B.x - A.x; double y = B.y - A.y;
+  // x *= 160/13;
+  // y *= 40/3;
   return sqrt(x*x + y*y);
 }
 
 int GetExpectedPositionIndex(double distance_traversed)
 {
   double distance = 0;
-  for(int i=5;i<path_points.size();i+=5)
+  if (distance_traversed==0)
   {
-    distance += dist(path_points[i-5], path_points[i]);
+    return 0;
+  }
+  for(int i=1;i<path_points.size();i++)
+  {
+    distance += dist(path_points[i], path_points[i-1]);
     if(distance>distance_traversed)
       return i;
   }
@@ -43,10 +51,9 @@ int GetExpectedPositionIndex(double distance_traversed)
 double GetPathLength()
 {
   double path_length = 0;
-  for(int i=5;i<path_points.size();i+=5)
+  for(int i=1;i<path_points.size();i++)
   {
-    path_length += dist(path_points[i], path_points[i-5]);
-    cout<<"adding "<<dist(path_points[i], path_points[i-5])<<endl;
+    path_length += dist(path_points[i], path_points[i-1]);
   }
   cout<<"in GetPathLength, pathLength = "<<path_length<<endl;
   return path_length;

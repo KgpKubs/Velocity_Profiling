@@ -21,7 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
   krssg_ssl_msgs
   tactics
   skills
-  robojackets
+#  robojackets
   genmsg
 )
 
