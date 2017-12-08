@@ -15,14 +15,6 @@ global pub
 pso = PSO(5,20,1000,1,1,0.5)
 errorInfo = Error()
 
-# homePos = []
-# homeBotTheta = []
-# def CallbackBS(msg):
-#     # print("BeliefState OK")
-#     for id in msg.homePos:
-#         homePos.append([id.x,id.y])
-#         homeBotTheta.append(id.theta)
-
 def CallbackPID(msg):
     global pub
     global lastTime
@@ -45,7 +37,6 @@ def CallbackPID(msg):
 
     command_msgs = gr_Robot_Command()
     final_msgs = gr_Commands()
-
     command_msgs.id          = 0
     command_msgs.wheelsspeed = 0
     command_msgs.veltangent  = vXBot/1000

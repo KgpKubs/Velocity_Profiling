@@ -1,7 +1,27 @@
+##
+## @file pid.py
+## @brief Return velocity after applying PID
+##
+
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 dt = 0.001
+
+
+##
+## @brief      PID on velocity vx,vy
+##
+## @param      vX         velocity in x
+## @param      vY         velocity in y
+## @param      errorInfo  The error information
+## @param      pso        Particle Swarm Optimiser object
+## 
+## @see        error.py
+##
+##
+## @return     Velocity after PID
+##
 def pid(vX,vY,errorInfo,pso=None):
 	errorPX = errorInfo.errorX
 	errorPY = errorInfo.errorY
@@ -31,10 +51,6 @@ def pid(vX,vY,errorInfo,pso=None):
 
 		k = pso.swarm[p].k
 
-		# Disabling I & D in PID
-		# k[1] = k[2] = 0
-		# k[0] = 0
-		
 		deltaVX = errorX.dot(k)
 		deltaVY = errorY.dot(k)
 
@@ -51,12 +67,6 @@ def pid(vX,vY,errorInfo,pso=None):
 		errorInfo.lastErrorY = errorInfo.errorY
 
 		pso.swarm[p].move = (currMove + 1)%maxMoves
-
-		# print("Move ->{} Particle -> {} Iter -> {}".format(currMove,p,currIter))
-		# print("Error ->{} CurrK -> {}".format(pso.swarm[p].currErrorSum,k[0]))
-		# print("Best Error ->{} Best K-> {}".format(pso.minGlobalError,pso.bestGlobalK[0]))
-		# print("Error Magnitude -> {}".format(errorMagnitude))
-		# print("Time -> {}".format(time.time() - pso.lastTime))
 		pso.lastTime = time.time()
 		pso.errors.append(errorMagnitude)
 
@@ -78,8 +88,8 @@ def pid(vX,vY,errorInfo,pso=None):
 			if pso.currParticle == 0:
 				pso.currIter = currIter + 1
 
-		if pso.currIter == 20:
-			plt.plot(pso.errors)
-			plt.show()
+		# if pso.currIter == 20:
+		# 	plt.plot(pso.errors)
+		# 	plt.show()
 
 		return vX,vY
