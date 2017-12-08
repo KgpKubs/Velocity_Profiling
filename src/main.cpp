@@ -15,6 +15,7 @@ double VEL_ANGLE = 0;
 #define radius 100
 int count = 1;
 double current_speed = 0;
+int flagreplan = 0;
 void send_stop()
 {
 	cout<<"sending stop\n";
@@ -24,6 +25,7 @@ void send_stop()
 	msg.errorX = 0;
 	msg.errorY = 0;
 	msg.id = BOT_ID;
+	msg.flag = flagreplan;
 	current_speed = 0;
 	pub.publish(msg);
 	return ;
@@ -48,7 +50,7 @@ bool InEllipse(int my_id, int opp_id, double alpha)
 }
 
 int cnt = 5, cnt1 = 5;
-// bool FLAG = false;
+bool FLAG = false;
 
 bool InEllipse1(int my_id, int opp_id, double alpha)
 {
@@ -70,11 +72,11 @@ bool InEllipse1(int my_id, int opp_id, double alpha)
 
 bool ShouldReplan()
 {
-	// if(current_speed<1)
-	// {
-	// 	FLAG = false;
-	// 	return false;
-	// }
+	if(current_speed<1)
+	{
+		FLAG = false;
+		return false;
+	}
 
 	for(int i=0;i<away_pos.size();i++)
 		if(InEllipse(BOT_ID, i, VEL_ANGLE))
@@ -84,7 +86,6 @@ bool ShouldReplan()
 			return true;	
 	return false;	
 }
-
 void send_vel(double speed, double motion_angle, int index)
 {
 	krssg_ssl_msgs::pid_message msg;
@@ -96,17 +97,18 @@ void send_vel(double speed, double motion_angle, int index)
 	double vY = speed*sin(motion_angle);
 	msg.velX = vX;
 	msg.velY = vY;
+	msg.flag = flagreplan;
 	// msg.velX = 0.0;
 	// msg.velY = 0.5;
 	msg.errorX = path_points[index].x - home_pos[BOT_ID].x;
 	msg.errorY = path_points[index].y - home_pos[BOT_ID].y;
 	double error_mag = sqrt(msg.errorX*msg.errorX + msg.errorY*msg.errorY);
-	// if(error_mag>320)
-	// {
-	// 	cout<<"error_mag = "<<error_mag<<endl;
+	if(error_mag>320)
+	{
+		cout<<"error_mag = "<<error_mag<<endl;
 
-	// 	FLAG = true;
-	// }
+		FLAG = true;
+	}
 	msg.id = BOT_ID;
 	msg.botAngle = bot_angle;
 
@@ -138,23 +140,26 @@ void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 	curr_time = ros::Time::now().toSec();
 	double t = curr_time - start_time;
 
-	// if(ShouldReplan() || FLAG || t>ExpectedTraverseTime)
-	// {	flag = 0;
-	// 	if(FLAG)
-	// 		cout<<"------------Reason FLAG\n";
-	// 	else if(t>ExpectedTraverseTime)
-	// 		cout<<" Time Out, So REPLANNING! \n\n";
-	// 	else
-	// 		cout<<"ShouldReplan returned true! \n\n\n\n";
-	// 	cnt--;
-	// 	cout<<"Replanning! \n";
-	// 	send_stop();
-	// 	krssg_ssl_msgs::replan msg;
-	// 	msg.x = true;
-	// 	pubreplan.publish(msg);
-	// 	FLAG = false;
-	// 	return;
-	// }
+
+	flagreplan = 0;
+	if(ShouldReplan() || FLAG || t>ExpectedTraverseTime)
+	{	flag = 0;
+		flagreplan = 1;
+		if(FLAG)
+			cout<<"------------Reason FLAG\n";
+		else if(t>ExpectedTraverseTime)
+			cout<<" Time Out, So REPLANNING! \n\n";
+		else
+			cout<<"ShouldReplan returned true! \n\n\n\n";
+		cnt--;
+		cout<<"Replanning! \n";
+		send_stop();
+		krssg_ssl_msgs::replan msg;
+		msg.x = true;
+		pubreplan.publish(msg);
+		FLAG = false;
+		return;
+	}
 
 	if(trapezoid(t, distance_traversed, out_speed))
 	{
@@ -243,6 +248,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "vel_profiling");
 
   	ros::NodeHandle n;
+  	flagreplan = 1;
 	ros::Subscriber sub = n.subscribe("/path_planner_ompl", 1000, Callback);
 	pub = n.advertise<krssg_ssl_msgs::pid_message>("/pid", 1000);
 	pubreplan = n.advertise<krssg_ssl_msgs::replan>("/replan",1000);

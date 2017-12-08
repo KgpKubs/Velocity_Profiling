@@ -12,7 +12,7 @@ from math import cos, sin, pow
 global lastTime
 global pub
 
-pso = PSO(5,20,1000,1,1,0.5)
+pso = PSO(15,20,1000,1,1,0.5)
 errorInfo = Error()
 
 # homePos = []
@@ -26,21 +26,26 @@ errorInfo = Error()
 def CallbackPID(msg):
     global pub
     global lastTime
-    print("PID Callback OK")
+    global pso
+    # print("PID Callback OK")
     velX = msg.velX*1000
     velY = msg.velY*1000
+    flag = msg.flag
+    if flag:
+        print("Replanned")
+        pso = PSO(15,20,1000,1,1,0.5)
 
     errorInfo.errorX = msg.errorX
     errorInfo.errorY = msg.errorY
-    print("INitial",velX,velY)
+    # print("INitial",velX,velY)
     vX,vY = pid(velX,velY,errorInfo,pso)
     # vX,vY = velX,velY
-    print("Changed",vX,vY)
+    # print("Changed",vX,vY)
     botAngle = msg.botAngle
-    print("BotAngle ", botAngle)
+    # print("BotAngle ", botAngle)
     vXBot = vX*cos(botAngle) + vY*sin(botAngle)
     vYBot = -vX*sin(botAngle) + vY*cos(botAngle)
-    print("Velocity ",vXBot,vYBot)
+    # print("Velocity ",vXBot,vYBot)
 
 
     command_msgs = gr_Robot_Command()
@@ -73,7 +78,7 @@ def CallbackPID(msg):
 def main():
     global pub
     global lastTime
-    print("Starting pid operator")
+    # print("Starting pid operator")
     rospy.init_node('pidOperator', anonymous=False)
     # t = rospy.get_rostime()
     # lastTime = t.secs + t.nsecs/pow(10,9)
