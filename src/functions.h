@@ -7,12 +7,14 @@
 #include "krssg_ssl_msgs/gr_Robot_Command.h"
 #include "krssg_ssl_msgs/BeliefState.h"
 #include "krssg_ssl_msgs/pid_message.h"
+#include "krssg_ssl_msgs/replan.h"
 #include <ssl_common/config.h>
 #include <ssl_common/grSimComm.h>
 using namespace std;
 
 #define point krssg_ssl_msgs::point_2d
 vector<point> home_pos(6);
+vector<point> away_pos(6);
 vector<point> path_points;
 // krssg_ssl_msgs::point_2d myLastPos;
 vector<double> vel_angle;

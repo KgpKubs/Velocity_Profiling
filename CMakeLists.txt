@@ -17,10 +17,10 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   ssl_common
-  ssl_robot
+  #ssl_robot
   krssg_ssl_msgs
-  tactics
-  skills
+  #tactics
+  #skills
 #  robojackets
   genmsg
 )

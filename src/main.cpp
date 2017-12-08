@@ -3,12 +3,18 @@
 using namespace std;
 
 const int MAX_VEL = 50, BOT_ID = 0;
-ros::Publisher pub, pub_to_gui;
+ros::Publisher pub, pub_to_gui, pubreplan;
 krssg_ssl_msgs::planner_path path_points_pub;
 krssg_ssl_msgs::point_2d point_;
 krssg_ssl_msgs::gr_Commands final_msgs;
 krssg_ssl_msgs::gr_Robot_Command command_msgs;
-
+double VEL_ANGLE = 0;
+#define MAJOR_AXIS_FACTOR 10
+#define MINOR_AXIS_FACTOR 2
+#define PI 3.141592653589793
+#define radius 100
+int count = 1;
+double current_speed = 0;
 void send_stop()
 {
 	cout<<"sending stop\n";
@@ -18,13 +24,71 @@ void send_stop()
 	msg.errorX = 0;
 	msg.errorY = 0;
 	msg.id = BOT_ID;
+	current_speed = 0;
 	pub.publish(msg);
 	return ;
+}
+
+bool InEllipse(int my_id, int opp_id, double alpha)
+{
+  double a = MAJOR_AXIS_FACTOR*radius/2.0, b = MINOR_AXIS_FACTOR*radius/2.0;
+  double x0 = home_pos[my_id].x + a*cos(alpha), y0 = home_pos[my_id].y + a*sin(alpha);
+  double xp = away_pos[opp_id].x, yp = away_pos[opp_id].y;
+  double v1 = (cos(alpha)*(xp-x0) + sin(alpha)*(yp-y0))/a;
+  double v2 = (sin(alpha)*(xp-x0) - cos(alpha)*(yp-y0))/b;
+  // cout<<"center = "<<x0<<","<<y0<<" point = "<<xp<<","<<yp<<endl;
+  v1 = v1*v1;
+  v2 = v2*v2;
+  double value = v1  + v2;
+  // cout<<"value = "<<value<<"\n alpha = "<<alpha*180/PI<<endl;
+  if(value<=1)
+    return 1;
+  else
+    return 0;
+}
+
+int cnt = 5, cnt1 = 5;
+// bool FLAG = false;
+
+bool InEllipse1(int my_id, int opp_id, double alpha)
+{
+  double a = MAJOR_AXIS_FACTOR*radius/2.0, b = MINOR_AXIS_FACTOR*radius/2.0;
+  double x0 = home_pos[my_id].x + a*cos(alpha), y0 = home_pos[my_id].y + a*sin(alpha);
+  double xp = home_pos[opp_id].x, yp = home_pos[opp_id].y;
+  double v1 = (cos(alpha)*(xp-x0) + sin(alpha)*(yp-y0))/a;
+  double v2 = (sin(alpha)*(xp-x0) - cos(alpha)*(yp-y0))/b;
+  // cout<<"center = "<<x0<<","<<y0<<" point = "<<xp<<","<<yp<<endl;
+  v1 = v1*v1;
+  v2 = v2*v2;
+  double value = v1  + v2;
+  // cout<<"value = "<<value<<"\n alpha = "<<alpha*180/PI<<endl;
+  if(value<=1)
+    return 1;
+  else
+    return 0;
+}
+
+bool ShouldReplan()
+{
+	// if(current_speed<1)
+	// {
+	// 	FLAG = false;
+	// 	return false;
+	// }
+
+	for(int i=0;i<away_pos.size();i++)
+		if(InEllipse(BOT_ID, i, VEL_ANGLE))
+			return true;
+	for(int i=1;i<home_pos.size();i++)
+		if(InEllipse1(BOT_ID, i, VEL_ANGLE))
+			return true;	
+	return false;	
 }
 
 void send_vel(double speed, double motion_angle, int index)
 {
 	krssg_ssl_msgs::pid_message msg;
+	current_speed = speed;
 	speed/=1000 ;
 	cout<<"motion_angle = "<<motion_angle<<endl;
 	double bot_angle = home_pos_theta[BOT_ID];
@@ -36,57 +100,62 @@ void send_vel(double speed, double motion_angle, int index)
 	// msg.velY = 0.5;
 	msg.errorX = path_points[index].x - home_pos[BOT_ID].x;
 	msg.errorY = path_points[index].y - home_pos[BOT_ID].y;
+	double error_mag = sqrt(msg.errorX*msg.errorX + msg.errorY*msg.errorY);
+	// if(error_mag>320)
+	// {
+	// 	cout<<"error_mag = "<<error_mag<<endl;
+
+	// 	FLAG = true;
+	// }
 	msg.id = BOT_ID;
 	msg.botAngle = bot_angle;
 
 	pub.publish(msg);
-	// double vel_tangent = speed*cos(bot_angle - motion_angle);
-	// double vel_normal = -speed*sin(bot_angle - motion_angle);
-// 
-	// command_msgs.veltangent  = vel_tangent;
-	// command_msgs.velnormal   = vel_normal;
-	// final_msgs.isteamyellow   = false;
-	// final_msgs.robot_commands = command_msgs;
-	// final_msgs.timestamp      = ros::Time::now().toSec();
-	// pub.publish(final_msgs);
+	VEL_ANGLE = motion_angle;
+	
 	return;
 }
 
+int flag = 0;
 void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 {
+	cout<<"speed = "<<current_speed<<endl;
 	if(PATH_RECEIVED==false)
 	{
 		cout<<"Path PATH_RECEIVED = False\n";
 		return;
 	}
 
-	// path_points_pub.point_array.clear();
-	// for(int i=0;i<path_points.size();i++)
-	// {
-	// 	  point_.x=path_points[i].x;
-	//       point_.y=path_points[i].y;
-	//       path_points_pub.point_array.push_back(point_);
-	// }
- //    pub_to_gui.publish(path_points_pub);
-
 	for(int i=0;i<6;i++)
 	{
 		home_pos_theta[i] = msg->homePos[i].theta;
 		home_pos[i].x = msg->homePos[i].x;
 		home_pos[i].y = msg->homePos[i].y;
+		away_pos[i].x = msg->awayPos[i].x;
+		away_pos[i].y = msg->awayPos[i].y;
 	}
+
 	curr_time = ros::Time::now().toSec();
 	double t = curr_time - start_time;
 
-	if(t>ExpectedTraverseTime)
-	{
-		cout<<"OUT OF TIME!! ExpectedTraverseTime = "<<ExpectedTraverseTime<<"\n";
-		send_stop();
-		return;
-	}
+	// if(ShouldReplan() || FLAG || t>ExpectedTraverseTime)
+	// {	flag = 0;
+	// 	if(FLAG)
+	// 		cout<<"------------Reason FLAG\n";
+	// 	else if(t>ExpectedTraverseTime)
+	// 		cout<<" Time Out, So REPLANNING! \n\n";
+	// 	else
+	// 		cout<<"ShouldReplan returned true! \n\n\n\n";
+	// 	cnt--;
+	// 	cout<<"Replanning! \n";
+	// 	send_stop();
+	// 	krssg_ssl_msgs::replan msg;
+	// 	msg.x = true;
+	// 	pubreplan.publish(msg);
+	// 	FLAG = false;
+	// 	return;
+	// }
 
-	// cout<<"start_time = "<<start_time<<endl;
-	// cout<<"Calling Trapezoid!! t = "<<t<<endl;
 	if(trapezoid(t, distance_traversed, out_speed))
 	{
 		int index = GetExpectedPositionIndex(distance_traversed);
@@ -97,9 +166,6 @@ void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 			return;
 		}
 		send_vel(out_speed, vel_angle[index],index);
-		// cout<<"Error = "<<dist(path_points[index], home_pos[BOT_ID])<<endl;
-		// cout<<"Travelled "<<distance_traversed/path_length*100<<"percent \n";
-		// cout<<"Going with vel = "<<out_speed<<" at "<<vel_angle[index]*180/(PI)<<" degree\n";
 	}
 	else
 	{
@@ -108,21 +174,20 @@ void Callback_BS(const krssg_ssl_msgs::BeliefState::ConstPtr& msg)
 	}
 }
 
-int flag = 0;
 void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 {
-	if(flag==1) return;
-	flag=1;
+	if(flag==1)
+		return;
+	flag = 1;
 	cout<<"in path_planner Callback function. \n";
 	PATH_RECEIVED = true;
 	path_points.clear();
 	vel_angle.clear();
+	double dely = msg->point_array[2].y - msg->point_array[0].y;
+	double delx = msg->point_array[2].x - msg->point_array[0].x;
+	VEL_ANGLE = atan2(dely, delx);
 	int size_ = msg->point_array.size();
 
-	// for (int i = 0; i < size_; ++i)
-	// {
-		// cout<<"("<<msg->point_array[i].x<<","<<msg->point_array[i].y<<"),"<<endl;
-	// }
 	cout<<endl;
 	for(int i=0;i<size_;i++)
 	{
@@ -170,7 +235,7 @@ void Callback(const krssg_ssl_msgs::planner_path::ConstPtr& msg)
 	cout<<endl;
 	start_time = ros::Time::now().toSec();
 	curr_time =  ros::Time::now().toSec();
-	// cout<<"setting start_time = "<<start_time<<endl;
+	cout<<"setting start_time = "<<start_time<<endl;
 }
 
 int main(int argc, char **argv)
@@ -180,7 +245,7 @@ int main(int argc, char **argv)
   	ros::NodeHandle n;
 	ros::Subscriber sub = n.subscribe("/path_planner_ompl", 1000, Callback);
 	pub = n.advertise<krssg_ssl_msgs::pid_message>("/pid", 1000);
-	pub_to_gui = n.advertise<krssg_ssl_msgs::planner_path>("/vel_profile_to_gui", 1000);
+	pubreplan = n.advertise<krssg_ssl_msgs::replan>("/replan",1000);
 	ros::Subscriber sub1 = n.subscribe("/belief_state", 1000, Callback_BS);
 	ros::spin();
 	return 0;

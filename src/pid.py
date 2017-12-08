@@ -78,8 +78,8 @@ def pid(vX,vY,errorInfo,pso=None):
 			if pso.currParticle == 0:
 				pso.currIter = currIter + 1
 
-		if pso.currIter == 20:
-			plt.plot(pso.errors)
-			plt.show()
+		# if pso.currIter == 20:
+		# 	plt.plot(pso.errors)
+		# 	plt.show()
 
 		return vX,vY

@@ -54,6 +54,9 @@ def CallbackPID(msg):
     command_msgs.kickspeedx  = 0
     command_msgs.kickspeedz  = 0
     command_msgs.spinner     = False
+
+    if(msg.velX == msg.velY and msg.velX==0):
+        command_msgs.velnormal = command_msgs.veltangent = 0
     # t = rospy.get_rostime()
     # currTime = t.secs + t.nsecs/pow(10,9)
     # diffT = float(currTime - lastTime)
