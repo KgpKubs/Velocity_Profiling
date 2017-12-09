@@ -273,5 +273,17 @@ class Velocity():
   		valid = self.trapezoidalMotion(self.pathLength, self.maxSpeed, self.maxAcc, timeIntoLap, self.startSpeed, self.finalSpeed)
   		return valid
 
-  	
-  	
+  	def Ellipse(self, myPos, oppPos, angle):
+  		a = 1.0*majorAxis*BOT_RADIUS/2.0
+  		b = 1.0*minorAxis*BOT_RADIUS/2.0
+  		xOne = myPos.x + a*cos(angle)
+  		yOne = myPos.y + a*sin(alpha)
+  		xTwo = oppPos.x
+  		yTwo = oppPos.y
+  		vOne = (cos(angle)*(xTwo - xOne) + sin(angle)*(yTwo - yOne))/a
+  		vTwo = (sin(angle)*(xTwo - xOne) - cos(angle)*(yTwo - yOne))/b
+  		value = pow(vOne,2) + pow(vTwo,2)
+  		if valid <= 1:
+  			return 1
+  		else:
+  			return 0
