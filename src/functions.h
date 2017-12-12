@@ -8,8 +8,6 @@
 #include "krssg_ssl_msgs/BeliefState.h"
 #include "krssg_ssl_msgs/pid_message.h"
 #include "krssg_ssl_msgs/replan.h"
-#include <ssl_common/config.h>
-#include <ssl_common/grSimComm.h>
 using namespace std;
 
 #define point krssg_ssl_msgs::point_2d
