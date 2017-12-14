@@ -16,7 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-  ssl_common
+  #ssl_common
   #ssl_robot
   krssg_ssl_msgs
   #tactics

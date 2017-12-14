@@ -12,7 +12,7 @@ def pid(vX,vY,errorInfo,pso=None):
 	errorX = np.array([errorPX,errorIX,errorDX])
 	errorY = np.array([errorPY,errorIY,errorDY])
 	if pso==None:
-		k = np.array([]) 		#define k
+		k = np.array([2.0,0,0]) 		#define k
 		deltaVX = errorX.dot(k)
 		deltaVY = errorY.dot(k)
 
@@ -30,7 +30,6 @@ def pid(vX,vY,errorInfo,pso=None):
 		maxIter = pso.maxIter
 
 		k = pso.swarm[p].k
-
 		# Disabling I & D in PID
 		# k[1] = k[2] = 0
 		# k[0] = 0
